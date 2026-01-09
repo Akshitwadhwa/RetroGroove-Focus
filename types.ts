@@ -17,6 +17,7 @@ export interface PlayerState {
   isPlaying: boolean;
   currentTrack: AudiusTrack | null;
   volume: number;
+  queue: AudiusTrack[];
 }
 
 export interface TimerState {

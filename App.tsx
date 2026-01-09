@@ -4,10 +4,11 @@ import Timer from './components/Timer';
 import TrackSearch from './components/TrackSearch';
 import GrainOverlay from './components/GrainOverlay';
 import SettingsModal from './components/SettingsModal';
+import QueueList from './components/QueueList';
 import DarkModeToggle from './components/DarkModeToggle';
 import { AudiusTrack, PlayerState, TimerState } from './types';
 import { getStreamUrl } from './services/audius';
-import { Volume2, VolumeX, Settings } from 'lucide-react';
+import { Volume2, VolumeX, Settings, SkipForward } from 'lucide-react';
 
 const DEFAULT_FOCUS_TIME = 25 * 60; // 25 minutes default
 
@@ -24,6 +25,7 @@ const App: React.FC = () => {
     isPlaying: false,
     currentTrack: null,
     volume: 0.5,
+    queue: [],
   });
 
   const [timer, setTimer] = useState<TimerState>({
@@ -128,6 +130,43 @@ const App: React.FC = () => {
     setPlayer(prev => ({ ...prev, isPlaying: false }));
   };
 
+  const handleTrackEnd = () => {
+    if (player.queue.length > 0) {
+      const nextTrack = player.queue[0];
+      const newQueue = player.queue.slice(1);
+      setPlayer(prev => ({
+        ...prev,
+        currentTrack: nextTrack,
+        queue: newQueue,
+        isPlaying: true // Keep playing next track
+      }));
+    } else {
+      // Loop current track if queue is empty (optional, or just stop)
+      // For now, let's stop to match previous behavior, or we could loop.
+      // The user requested a queue, so let's assume they want flow.
+      // If queue is empty, maybe we should loop the *current* track like before?
+      // The previous code had `loop` prop. Let's replicate "Loop if no queue".
+      if (audioRef.current) {
+        audioRef.current.currentTime = 0;
+        audioRef.current.play();
+      }
+    }
+  };
+
+  const handleAddToQueue = (track: AudiusTrack) => {
+    setPlayer(prev => ({
+      ...prev,
+      queue: [...prev.queue, track]
+    }));
+  };
+
+  const handleRemoveFromQueue = (index: number) => {
+    setPlayer(prev => ({
+      ...prev,
+      queue: prev.queue.filter((_, i) => i !== index)
+    }));
+  };
+
   return (
     <div className="relative min-h-screen w-full flex flex-col md:flex-row overflow-hidden bg-matcha dark:bg-charcoal selection:bg-retro-orange selection:text-white transition-colors duration-500">
       <GrainOverlay />
@@ -136,15 +175,18 @@ const App: React.FC = () => {
       <DarkModeToggle isDark={isDarkMode} onToggle={toggleDarkMode} />
 
       {/* Search Bar */}
-      <TrackSearch onSelectTrack={handleTrackSelect} currentTrack={player.currentTrack} />
+      <TrackSearch
+        onSelectTrack={handleTrackSelect}
+        onAddToQueue={handleAddToQueue}
+        currentTrack={player.currentTrack}
+      />
 
       {/* Hidden Audio Element */}
       {player.currentTrack && (
         <audio
           ref={audioRef}
           src={getStreamUrl(player.currentTrack.id)}
-          onEnded={() => setPlayer(prev => ({ ...prev, isPlaying: false }))}
-          loop
+          onEnded={handleTrackEnd}
         />
       )}
 
@@ -184,21 +226,41 @@ const App: React.FC = () => {
           onReset={resetTimer}
         />
 
-        {/* Volume Control */}
-        <div className="flex items-center space-x-4 w-full max-w-[200px]">
-          <button onClick={() => setIsMuted(!isMuted)} className="text-charcoal dark:text-matcha hover:text-retro-orange transition-colors">
-            {isMuted ? <VolumeX size={20} /> : <Volume2 size={20} />}
-          </button>
-          <input
-            type="range"
-            min="0"
-            max="1"
-            step="0.01"
-            value={player.volume}
-            onChange={(e) => setPlayer(prev => ({ ...prev, volume: parseFloat(e.target.value) }))}
-            className="w-full h-1 bg-charcoal/20 dark:bg-matcha/20 rounded-lg appearance-none cursor-pointer [&::-webkit-slider-thumb]:appearance-none [&::-webkit-slider-thumb]:w-3 [&::-webkit-slider-thumb]:h-3 [&::-webkit-slider-thumb]:rounded-full [&::-webkit-slider-thumb]:bg-retro-orange"
-          />
+        {/* Media Controls */}
+        <div className="flex flex-col items-center gap-4 w-full max-w-[250px]">
+          {/* Volume & Skip Row */}
+          <div className="flex items-center gap-4 w-full justify-between">
+            <button
+              onClick={handleTrackEnd}
+              disabled={player.queue.length === 0}
+              className={`p-2 rounded-full transition-all ${player.queue.length > 0
+                  ? 'text-charcoal dark:text-matcha hover:bg-charcoal/10 dark:hover:bg-matcha/10 hover:scale-105 active:scale-95 cursor-pointer'
+                  : 'text-charcoal/20 dark:text-matcha/20 cursor-not-allowed'
+                }`}
+              title="Skip to next track"
+            >
+              <SkipForward size={24} />
+            </button>
+
+            <div className="flex items-center gap-2 flex-1">
+              <button onClick={() => setIsMuted(!isMuted)} className="text-charcoal dark:text-matcha hover:text-retro-orange transition-colors">
+                {isMuted ? <VolumeX size={20} /> : <Volume2 size={20} />}
+              </button>
+              <input
+                type="range"
+                min="0"
+                max="1"
+                step="0.01"
+                value={player.volume}
+                onChange={(e) => setPlayer(prev => ({ ...prev, volume: parseFloat(e.target.value) }))}
+                className="w-full h-1 bg-charcoal/20 dark:bg-matcha/20 rounded-lg appearance-none cursor-pointer [&::-webkit-slider-thumb]:appearance-none [&::-webkit-slider-thumb]:w-3 [&::-webkit-slider-thumb]:h-3 [&::-webkit-slider-thumb]:rounded-full [&::-webkit-slider-thumb]:bg-retro-orange"
+              />
+            </div>
+          </div>
         </div>
+
+        {/* Queue List */}
+        <QueueList queue={player.queue} onRemove={handleRemoveFromQueue} />
 
         {/* Footer Info */}
         <div className="absolute bottom-4 text-[10px] text-charcoal/30 dark:text-matcha/30 font-mono text-center w-full px-4 transition-colors duration-500">

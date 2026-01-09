@@ -1,14 +1,15 @@
 import React, { useState, useEffect, useRef } from 'react';
-import { Search, Music, Loader2, X } from 'lucide-react';
+import { Search, Music, Loader2, X, PlusCircle } from 'lucide-react';
 import { searchTracks, getArtworkUrl } from '../services/audius';
 import { AudiusTrack } from '../types';
 
 interface TrackSearchProps {
   onSelectTrack: (track: AudiusTrack) => void;
+  onAddToQueue: (track: AudiusTrack) => void;
   currentTrack: AudiusTrack | null;
 }
 
-const TrackSearch: React.FC<TrackSearchProps> = ({ onSelectTrack, currentTrack }) => {
+const TrackSearch: React.FC<TrackSearchProps> = ({ onSelectTrack, onAddToQueue, currentTrack }) => {
   const [query, setQuery] = useState('');
   const [results, setResults] = useState<AudiusTrack[]>([]);
   const [loading, setLoading] = useState(false);
@@ -59,7 +60,7 @@ const TrackSearch: React.FC<TrackSearchProps> = ({ onSelectTrack, currentTrack }
           onFocus={() => { if (results.length > 0) setIsOpen(true); }}
         />
         {query && (
-          <button 
+          <button
             className="absolute inset-y-0 right-0 pr-3 flex items-center text-charcoal/50 hover:text-retro-orange"
             onClick={() => { setQuery(''); setResults([]); }}
           >
@@ -79,8 +80,8 @@ const TrackSearch: React.FC<TrackSearchProps> = ({ onSelectTrack, currentTrack }
           ) : results.length > 0 ? (
             <ul className="divide-y divide-charcoal/5">
               {results.map((track) => (
-                <li 
-                  key={track.id} 
+                <li
+                  key={track.id}
                   className="hover:bg-matcha cursor-pointer transition-colors p-3 flex items-center gap-3"
                   onClick={() => {
                     onSelectTrack(track);
@@ -88,29 +89,44 @@ const TrackSearch: React.FC<TrackSearchProps> = ({ onSelectTrack, currentTrack }
                     setQuery('');
                   }}
                 >
-                  <img 
-                    src={getArtworkUrl(track)} 
-                    alt={track.title} 
+                  <img
+                    src={getArtworkUrl(track)}
+                    alt={track.title}
                     className="w-10 h-10 rounded-md object-cover border border-charcoal/10"
                   />
                   <div className="flex-1 min-w-0">
                     <p className="text-sm font-bold truncate text-charcoal">{track.title}</p>
                     <p className="text-xs text-charcoal/60 truncate">{track.user.name}</p>
                   </div>
-                  {currentTrack?.id === track.id && (
+                  {currentTrack?.id === track.id ? (
                     <div className="text-retro-orange">
                       <Music size={16} />
                     </div>
+                  ) : (
+                    <button
+                      className="text-charcoal/40 hover:text-retro-orange transition-colors p-1"
+                      title="Add to Queue"
+                      onClick={(e) => {
+                        e.stopPropagation();
+                        onAddToQueue(track);
+                        setQuery(''); // Optional: clear search after adding? Maybe keep it open.
+                        // Let's keep it open or close depending on UX. The user wanted to "queue in songs", implied plural.
+                        // So I won't close it, but I should probably give feedback.
+                        // For now just add to queue.
+                      }}
+                    >
+                      <PlusCircle size={20} />
+                    </button>
                   )}
                 </li>
               ))}
             </ul>
           ) : (
-             query.length > 2 && (
+            query.length > 2 && (
               <div className="p-4 text-center text-charcoal/50 text-sm">
                 No tracks found. Try a different genre.
               </div>
-             )
+            )
           )}
         </div>
       )}
