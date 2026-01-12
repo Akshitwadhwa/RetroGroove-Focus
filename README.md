@@ -1,4 +1,4 @@
-# 🎵 Vinyl Focus
+# 🎵 RetroGroove-Focus
 
 <div align="center">
   <h3>A Retro-Themed Focus Timer & Lofi Player</h3>
@@ -9,7 +9,7 @@
 
 ## ✨ Overview
 
-**Vinyl Focus** is a beautifully crafted web application designed to help you get into the zone. Combining the tactile nostalgia of a vinyl record player with a functional Pomodoro timer, it provides the perfect atmosphere for deep work or study sessions.
+**RetroGroove-Focus** is a beautifully crafted web application designed to help you get into the zone. Combining the tactile nostalgia of a vinyl record player with a functional Pomodoro timer, it provides the perfect atmosphere for deep work or study sessions.
 
 Powered by the **Audius** decentralized music network, you have access to an endless library of lofi, jazz, and focus beats without any ads or interruptions.
 
