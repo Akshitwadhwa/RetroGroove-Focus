@@ -3,7 +3,6 @@ import React, { useEffect, useState } from 'react';
 import './LofiGirlOverlay.css';
 
 const images = [
-  '/Assests/1.jpg.webp',
   '/Assests/Still_frame_305145652f.jpg',
   '/Assests/lofi-girl-study-session-7endmb0g5zp6wzxb.jpg',
   '/Assests/pomodoro_a224d26448.webp',
