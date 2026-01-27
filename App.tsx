@@ -6,6 +6,7 @@ import GrainOverlay from './components/GrainOverlay';
 import SettingsModal from './components/SettingsModal';
 import QueueList from './components/QueueList';
 import DarkModeToggle from './components/DarkModeToggle';
+import LofiGirlOverlay from './components/LofiGirlOverlay';
 import { AudiusTrack, PlayerState, TimerState } from './types';
 import { getStreamUrl } from './services/audius';
 import { Volume2, VolumeX, Settings, SkipForward } from 'lucide-react';
@@ -40,6 +41,9 @@ const App: React.FC = () => {
     const saved = localStorage.getItem('darkMode');
     return saved ? JSON.parse(saved) : false;
   });
+
+  // Lofi Girl Mode State
+  const [isLofiGirlMode, setIsLofiGirlMode] = useState(false);
 
   // --- Dark Mode Logic ---
 
@@ -169,6 +173,8 @@ const App: React.FC = () => {
 
   return (
     <div className="relative min-h-screen w-full flex flex-col md:flex-row overflow-hidden bg-matcha dark:bg-charcoal selection:bg-retro-orange selection:text-white transition-colors duration-500">
+      {/* Lofi Girl Overlay */}
+      <LofiGirlOverlay active={isLofiGirlMode} />
       <GrainOverlay />
 
       {/* Dark Mode Toggle */}
@@ -192,17 +198,21 @@ const App: React.FC = () => {
 
       {/* Left / Top Section: Vinyl */}
       <main className="flex-1 flex flex-col items-center justify-center p-8 z-10 min-h-[50vh]">
-        <Vinyl isPlaying={player.isPlaying} track={player.currentTrack} />
-
-        {/* Track Info (Mobile mostly, but nice generally) */}
-        <div className="mt-12 text-center max-w-md">
-          <h1 className="text-2xl md:text-3xl font-bold text-charcoal dark:text-matcha truncate transition-colors duration-500">
-            {player.currentTrack ? player.currentTrack.title : "No Track Selected"}
-          </h1>
-          <p className="text-charcoal/60 dark:text-matcha/60 font-mono mt-2 uppercase tracking-widest text-sm transition-colors duration-500">
-            {player.currentTrack ? player.currentTrack.user.name : "Select music to begin"}
-          </p>
-        </div>
+        {/* Show Vinyl and Track Info only if Lofi Girl Mode is OFF */}
+        {!isLofiGirlMode && (
+          <>
+            <Vinyl isPlaying={player.isPlaying} track={player.currentTrack} />
+            {/* Track Info (Mobile mostly, but nice generally) */}
+            <div className="mt-12 text-center max-w-md">
+              <h1 className="text-2xl md:text-3xl font-bold text-charcoal dark:text-matcha truncate transition-colors duration-500">
+                {player.currentTrack ? player.currentTrack.title : "No Track Selected"}
+              </h1>
+              <p className="text-charcoal/60 dark:text-matcha/60 font-mono mt-2 uppercase tracking-widest text-sm transition-colors duration-500">
+                {player.currentTrack ? player.currentTrack.user.name : "Select music to begin"}
+              </p>
+            </div>
+          </>
+        )}
       </main>
 
       {/* Right / Bottom Section: Sidebar Controls */}
@@ -215,6 +225,15 @@ const App: React.FC = () => {
           aria-label="Settings"
         >
           <Settings size={20} />
+        </button>
+
+        {/* Lofi Girl Mode Toggle */}
+        <button
+          onClick={() => setIsLofiGirlMode((prev) => !prev)}
+          className={`p-2 rounded-full transition-all text-charcoal/40 dark:text-matcha/40 hover:text-retro-orange hover:bg-charcoal/5 dark:hover:bg-matcha/5 active:scale-95 mb-2`}
+          aria-label="Toggle Lofi Girl Mode"
+        >
+          {isLofiGirlMode ? 'Disable Lofi Girl Mode' : 'Enable Lofi Girl Mode'}
         </button>
 
         {/* Timer Module */}
