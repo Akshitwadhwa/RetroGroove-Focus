@@ -1,6 +1,4 @@
 
-[![Netlify Status](https://api.netlify.com/api/v1/badges/b9a68c34-5dba-4b2b-b461-97819866b6fb/deploy-status)](https://app.netlify.com/projects/retrogrovee/deploys)
-
 # 🎵 RetroGroove-Focus
 
 <div align="center">
@@ -13,7 +11,7 @@
 ## 🚀 Live Demo
 
 🎉 **RetroGroove-Focus is now live and ready to use!**  
-Try it out at: [https://retrogrovee.netlify.app](https://retrogrovee.netlify.app)
+Try it out at: [https://retro-groove-focus.vercel.app]
 
 ---
 
