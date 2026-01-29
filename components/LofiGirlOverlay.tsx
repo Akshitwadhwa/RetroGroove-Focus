@@ -3,9 +3,9 @@ import React, { useEffect, useState } from 'react';
 import './LofiGirlOverlay.css';
 
 const images = [
-  '/assests/Still_frame_305145652f.jpg',
-  '/assests/lofi-girl-study-session-7endmb0g5zp6wzxb.jpg',
-  '/assests/pomodoro_a224d26448.webp',
+  '/assests/Frame1.jpg',
+  '/assests/Frame2.webp',
+  '/assests/Frame3.jpg',
 ];
 
 const LofiGirlOverlay: React.FC<{ active: boolean }> = ({ active }) => {
