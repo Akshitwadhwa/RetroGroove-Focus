@@ -1,5 +1,6 @@
 
 import React, { useEffect, useState } from 'react';
+import { motion, AnimatePresence } from 'framer-motion';
 import './LofiGirlOverlay.css';
 
 const images = [
@@ -22,7 +23,17 @@ const LofiGirlOverlay: React.FC<{ active: boolean }> = ({ active }) => {
   if (!active) return null;
   return (
     <div className="lofi-girl-main-area">
-      <img src={images[current]} alt="Lofi Girl" className="lofi-girl-main-img" />
+      <AnimatePresence>
+        <motion.img
+          key={current}
+          src={images[current]}
+          alt="Lofi Girl"
+          className="lofi-girl-main-img"
+          initial={{ scale: 1 }}
+          animate={{ scale: 1.1 }}
+          transition={{ duration: 60, ease: "linear" }}
+        />
+      </AnimatePresence>
     </div>
   );
 };

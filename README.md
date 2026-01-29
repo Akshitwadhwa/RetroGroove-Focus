@@ -10,13 +10,14 @@
 
 ---
 
-## ✨ Overview
+## 🚀 Live Demo
 
-**RetroGroove-Focus** is a beautifully crafted web application designed to help you get into the zone. Combining the tactile nostalgia of a vinyl record player with a functional Pomodoro timer, it provides the perfect atmosphere for deep work or study sessions.
+🎉 **RetroGroove-Focus is now live and ready to use!**  
+Try it out at: [https://retrogrovee.netlify.app](https://retrogrovee.netlify.app)
 
-Powered by the **Audius** decentralized music network, you have access to an endless library of lofi, jazz, and focus beats without any ads or interruptions.
+---
 
-## 🚀 Features
+## ✨ Features
 
 - **💿 Interactive Vinyl Player**: A stunning, animated vinyl player that spins when music plays, complete with arm animations.
 - **⏱️ Integrated Focus Timer**: Built-in Pomodoro timer to manage your work sessions. Customizable durations.
