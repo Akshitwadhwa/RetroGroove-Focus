@@ -12,6 +12,11 @@ dist
 dist-ssr
 *.local
 
+# Local OAuth/backend experiments
+backend/
+server.mjs
+server.ts
+
 # Editor directories and files
 .vscode/*
 !.vscode/extensions.json

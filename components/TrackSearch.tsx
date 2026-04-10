@@ -1,15 +1,26 @@
 import React, { useState, useEffect, useRef } from 'react';
 import { Search, Music, Loader2, X, PlusCircle } from 'lucide-react';
 import { searchTracks, getArtworkUrl } from '../services/audius';
+import { searchSpotifyTracks } from '../services/spotify';
 import { AudiusTrack } from '../types';
 
 interface TrackSearchProps {
   onSelectTrack: (track: AudiusTrack) => void;
   onAddToQueue: (track: AudiusTrack) => void;
   currentTrack: AudiusTrack | null;
+  musicSource?: 'audius' | 'spotify';
+  onSourceChange?: (source: 'audius' | 'spotify') => void;
+  spotifyAuthenticated?: boolean;
 }
 
-const TrackSearch: React.FC<TrackSearchProps> = ({ onSelectTrack, onAddToQueue, currentTrack }) => {
+const TrackSearch: React.FC<TrackSearchProps> = ({
+  onSelectTrack,
+  onAddToQueue,
+  currentTrack,
+  musicSource = 'audius',
+  onSourceChange,
+  spotifyAuthenticated = false,
+}) => {
   const [query, setQuery] = useState('');
   const [results, setResults] = useState<AudiusTrack[]>([]);
   const [loading, setLoading] = useState(false);
@@ -21,7 +32,14 @@ const TrackSearch: React.FC<TrackSearchProps> = ({ onSelectTrack, onAddToQueue, 
     const timer = setTimeout(async () => {
       if (query.trim().length > 2) {
         setLoading(true);
-        const tracks = await searchTracks(query);
+        let tracks: AudiusTrack[] = [];
+        
+        if (musicSource === 'spotify' && spotifyAuthenticated) {
+          tracks = await searchSpotifyTracks(query);
+        } else {
+          tracks = await searchTracks(query);
+        }
+        
         setResults(tracks);
         setLoading(false);
         setIsOpen(true);
@@ -32,7 +50,7 @@ const TrackSearch: React.FC<TrackSearchProps> = ({ onSelectTrack, onAddToQueue, 
     }, 500);
 
     return () => clearTimeout(timer);
-  }, [query]);
+  }, [query, musicSource, spotifyAuthenticated]);
 
   // Close when clicking outside
   useEffect(() => {
@@ -53,20 +71,36 @@ const TrackSearch: React.FC<TrackSearchProps> = ({ onSelectTrack, onAddToQueue, 
         </div>
         <input
           type="text"
-          className="block w-full pl-10 pr-10 py-3 border-2 border-charcoal/10 rounded-full leading-5 bg-white/80 backdrop-blur-sm placeholder-charcoal/40 focus:outline-none focus:border-retro-orange focus:ring-0 sm:text-sm transition-colors font-mono shadow-sm"
-          placeholder="Search vibe (e.g. Lo-Fi, Jazz, Rain)"
+          className="block w-full pl-10 pr-20 py-3 border-2 border-charcoal/10 rounded-full leading-5 bg-white/80 backdrop-blur-sm placeholder-charcoal/40 focus:outline-none focus:border-retro-orange focus:ring-0 sm:text-sm transition-colors font-mono shadow-sm"
+          placeholder={`Search ${musicSource === 'spotify' ? 'Spotify' : 'Audius'}...`}
           value={query}
           onChange={(e) => setQuery(e.target.value)}
           onFocus={() => { if (results.length > 0) setIsOpen(true); }}
         />
-        {query && (
-          <button
-            className="absolute inset-y-0 right-0 pr-3 flex items-center text-charcoal/50 hover:text-retro-orange"
-            onClick={() => { setQuery(''); setResults([]); }}
-          >
-            <X size={16} />
-          </button>
-        )}
+        <div className="absolute inset-y-0 right-0 pr-2 flex items-center gap-1">
+          {query && (
+            <button
+              className="text-charcoal/50 hover:text-retro-orange transition-colors p-1"
+              onClick={() => { setQuery(''); setResults([]); }}
+            >
+              <X size={16} />
+            </button>
+          )}
+          {/* Source Toggle */}
+          {spotifyAuthenticated && onSourceChange && (
+            <button
+              onClick={() => onSourceChange(musicSource === 'spotify' ? 'audius' : 'spotify')}
+              className={`text-xs font-bold px-2 py-1 rounded transition-colors ${
+                musicSource === 'spotify'
+                  ? 'bg-green-500 text-white'
+                  : 'bg-charcoal/10 text-charcoal/60 hover:bg-charcoal/20'
+              }`}
+              title={`Switch to ${musicSource === 'spotify' ? 'Audius' : 'Spotify'}`}
+            >
+              {musicSource === 'spotify' ? '♪ SP' : 'AU'}
+            </button>
+          )}
+        </div>
       </div>
 
       {/* Results Dropdown */}

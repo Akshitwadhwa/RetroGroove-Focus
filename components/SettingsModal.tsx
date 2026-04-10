@@ -1,14 +1,25 @@
 import React, { useState, useEffect } from 'react';
-import { X, Check } from 'lucide-react';
+import { X, Check, LogOut } from 'lucide-react';
+import { getSpotifyLoginUrl, clearSpotifyToken } from '../services/spotify';
 
 interface SettingsModalProps {
   isOpen: boolean;
   onClose: () => void;
   currentDuration: number; // in seconds
   onSave: (newDuration: number) => void;
+  spotifyAuthenticated?: boolean;
+  onSpotifyAuth?: (authenticated: boolean) => void;
+  musicSource?: 'audius' | 'spotify';
 }
 
-const SettingsModal: React.FC<SettingsModalProps> = ({ isOpen, onClose, currentDuration, onSave }) => {
+const SettingsModal: React.FC<SettingsModalProps> = ({
+  isOpen,
+  onClose,
+  currentDuration,
+  onSave,
+  spotifyAuthenticated = false,
+  onSpotifyAuth,
+}) => {
   const [minutes, setMinutes] = useState(Math.floor(currentDuration / 60));
 
   // Sync state when opening
@@ -24,6 +35,21 @@ const SettingsModal: React.FC<SettingsModalProps> = ({ isOpen, onClose, currentD
     const validMinutes = Math.max(1, Math.min(180, minutes)); // Clamp between 1 and 180 mins
     onSave(validMinutes * 60);
     onClose();
+  };
+
+  const handleSpotifyLogin = async () => {
+    try {
+      const loginUrl = await getSpotifyLoginUrl();
+      window.location.assign(loginUrl);
+    } catch (error) {
+      console.error('Spotify login error:', error);
+      alert('Failed to start Spotify login. Verify redirect URI in Spotify Dashboard matches your current browser URL.');
+    }
+  };
+
+  const handleSpotifyLogout = () => {
+    clearSpotifyToken();
+    onSpotifyAuth?.(false);
   };
 
   const presets = [15, 25, 45, 60];
@@ -76,6 +102,34 @@ const SettingsModal: React.FC<SettingsModalProps> = ({ isOpen, onClose, currentD
                 </button>
               ))}
             </div>
+          </div>
+
+          {/* Spotify Section */}
+          <div className="border-t border-charcoal/5 pt-4">
+            <label className="block text-[10px] font-bold text-charcoal/50 uppercase tracking-widest mb-3">
+              Music Services
+            </label>
+            {spotifyAuthenticated ? (
+              <div className="space-y-2">
+                <div className="bg-green-500/10 border border-green-500/30 rounded-lg p-3 text-sm">
+                  <p className="text-green-700 font-bold">✓ Spotify Connected</p>
+                </div>
+                <button
+                  onClick={handleSpotifyLogout}
+                  className="w-full bg-red-500/10 text-red-600 border border-red-300 py-2 rounded-lg font-bold tracking-widest uppercase hover:bg-red-500/20 transition-all active:scale-95 flex items-center justify-center gap-2"
+                >
+                  <LogOut size={16} />
+                  Disconnect Spotify
+                </button>
+              </div>
+            ) : (
+              <button
+                onClick={handleSpotifyLogin}
+                className="w-full bg-green-500 text-white py-2 rounded-lg font-bold tracking-widest uppercase hover:bg-green-600 transition-all active:scale-95 shadow-lg"
+              >
+                Connect Spotify
+              </button>
+            )}
           </div>
 
           <button

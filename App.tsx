@@ -9,6 +9,7 @@ import DarkModeToggle from './components/DarkModeToggle';
 import LofiGirlOverlay from './components/LofiGirlOverlay';
 import { AudiusTrack, PlayerState, TimerState } from './types';
 import { getStreamUrl } from './services/audius';
+import { getAuthorizationCode, getAuthorizationError, exchangeCodeForToken, storeSpotifyToken, restoreSpotifyToken } from './services/spotify';
 import { Volume2, VolumeX, Settings, SkipForward } from 'lucide-react';
 
 const DEFAULT_FOCUS_TIME = 25 * 60; // 25 minutes default
@@ -20,6 +21,10 @@ const App: React.FC = () => {
   // Settings State
   const [focusDuration, setFocusDuration] = useState(DEFAULT_FOCUS_TIME);
   const [isSettingsOpen, setIsSettingsOpen] = useState(false);
+
+  // Music Source State
+  const [musicSource, setMusicSource] = useState<'audius' | 'spotify'>('audius');
+  const [spotifyAuthenticated, setSpotifyAuthenticated] = useState(false);
 
   // App State
   const [player, setPlayer] = useState<PlayerState>({
@@ -55,6 +60,40 @@ const App: React.FC = () => {
       document.documentElement.classList.remove('dark');
     }
   }, [isDarkMode]);
+
+  // --- Spotify Authentication Logic ---
+  useEffect(() => {
+    const initSpotify = async () => {
+      const authError = getAuthorizationError();
+      if (authError) {
+        console.error('Spotify authorization error:', authError);
+        setSpotifyAuthenticated(false);
+        return;
+      }
+
+      // Check for authorization code from redirect
+      const code = getAuthorizationCode();
+      if (code) {
+        const tokenData = await exchangeCodeForToken(code);
+        if (tokenData) {
+          storeSpotifyToken(tokenData.accessToken, tokenData.expiresIn);
+          setSpotifyAuthenticated(true);
+          setMusicSource('spotify');
+        }
+
+        // Clean up URL parameters from callback route
+        window.history.replaceState({}, document.title, window.location.pathname);
+      } else {
+        // Try to restore from localStorage
+        if (restoreSpotifyToken()) {
+          setSpotifyAuthenticated(true);
+        } else {
+          setSpotifyAuthenticated(false);
+        }
+      }
+    };
+    initSpotify();
+  }, []);
 
   const toggleDarkMode = () => {
     setIsDarkMode(prev => !prev);
@@ -185,13 +224,20 @@ const App: React.FC = () => {
         onSelectTrack={handleTrackSelect}
         onAddToQueue={handleAddToQueue}
         currentTrack={player.currentTrack}
+        musicSource={musicSource}
+        onSourceChange={setMusicSource}
+        spotifyAuthenticated={spotifyAuthenticated}
       />
 
       {/* Hidden Audio Element */}
       {player.currentTrack && (
         <audio
           ref={audioRef}
-          src={getStreamUrl(player.currentTrack.id)}
+          src={
+            musicSource === 'spotify' && player.currentTrack.preview_url
+              ? player.currentTrack.preview_url
+              : getStreamUrl(player.currentTrack.id)
+          }
           onEnded={handleTrackEnd}
         />
       )}
@@ -283,7 +329,7 @@ const App: React.FC = () => {
 
         {/* Footer Info */}
         <div className="absolute bottom-4 text-[10px] text-charcoal/30 dark:text-matcha/30 font-mono text-center w-full px-4 transition-colors duration-500">
-          <p>POWERED BY AUDIUS • BUILT FOR FOCUS</p>
+          <p>POWERED BY {musicSource === 'spotify' ? 'SPOTIFY' : 'AUDIUS'} • BUILT FOR FOCUS</p>
         </div>
       </aside>
 
@@ -293,6 +339,9 @@ const App: React.FC = () => {
         onClose={() => setIsSettingsOpen(false)}
         currentDuration={focusDuration}
         onSave={handleDurationUpdate}
+        spotifyAuthenticated={spotifyAuthenticated}
+        onSpotifyAuth={setSpotifyAuthenticated}
+        musicSource={musicSource}
       />
     </div>
   );

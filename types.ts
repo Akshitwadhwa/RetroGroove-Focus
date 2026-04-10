@@ -11,6 +11,8 @@ export interface AudiusTrack {
     '1000x1000': string;
   } | null;
   duration: number;
+  preview_url?: string;
+  source?: 'audius' | 'spotify';
 }
 
 export interface PlayerState {
