@@ -8,23 +8,47 @@ import QueueList from './components/QueueList';
 import DarkModeToggle from './components/DarkModeToggle';
 import LofiGirlOverlay from './components/LofiGirlOverlay';
 import { AudiusTrack, PlayerState, TimerState } from './types';
-import { getStreamUrl } from './services/audius';
-import { getAuthorizationCode, getAuthorizationError, exchangeCodeForToken, storeSpotifyToken, restoreSpotifyToken } from './services/spotify';
+import { getAuthorizationCode, getAuthorizationError, exchangeCodeForToken, storeSpotifyToken, restoreSpotifyToken, getSpotifyAccessToken } from './services/spotify';
 import { Volume2, VolumeX, Settings, SkipForward } from 'lucide-react';
 
 const DEFAULT_FOCUS_TIME = 25 * 60; // 25 minutes default
+let spotifySdkLoadingPromise: Promise<void> | null = null;
+
+const loadSpotifySdk = (): Promise<void> => {
+  if ((window as any).Spotify) return Promise.resolve();
+  if (spotifySdkLoadingPromise) return spotifySdkLoadingPromise;
+
+  spotifySdkLoadingPromise = new Promise((resolve, reject) => {
+    const existingScript = document.getElementById('spotify-player-sdk') as HTMLScriptElement | null;
+
+    if (existingScript) {
+      (window as any).onSpotifyWebPlaybackSDKReady = () => resolve();
+      return;
+    }
+
+    const script = document.createElement('script');
+    script.id = 'spotify-player-sdk';
+    script.src = 'https://sdk.scdn.co/spotify-player.js';
+    script.async = true;
+    script.onerror = () => reject(new Error('Failed to load Spotify Web Playback SDK.'));
+    (window as any).onSpotifyWebPlaybackSDKReady = () => resolve();
+    document.body.appendChild(script);
+  });
+
+  return spotifySdkLoadingPromise;
+};
 
 const App: React.FC = () => {
-  // Audio Ref
-  const audioRef = useRef<HTMLAudioElement>(null);
+  const spotifyPlayerRef = useRef<any>(null);
+  const [spotifyDeviceId, setSpotifyDeviceId] = useState<string | null>(null);
+  const [spotifySdkReady, setSpotifySdkReady] = useState(false);
 
   // Settings State
   const [focusDuration, setFocusDuration] = useState(DEFAULT_FOCUS_TIME);
   const [isSettingsOpen, setIsSettingsOpen] = useState(false);
 
-  // Music Source State
-  const [musicSource, setMusicSource] = useState<'audius' | 'spotify'>('audius');
   const [spotifyAuthenticated, setSpotifyAuthenticated] = useState(false);
+  const [spotifyPremiumErrorShown, setSpotifyPremiumErrorShown] = useState(false);
 
   // App State
   const [player, setPlayer] = useState<PlayerState>({
@@ -49,6 +73,7 @@ const App: React.FC = () => {
 
   // Lofi Girl Mode State
   const [isLofiGirlMode, setIsLofiGirlMode] = useState(false);
+  const [spotifyPlaybackHintShown, setSpotifyPlaybackHintShown] = useState(false);
 
   // --- Dark Mode Logic ---
 
@@ -78,7 +103,6 @@ const App: React.FC = () => {
         if (tokenData) {
           storeSpotifyToken(tokenData.accessToken, tokenData.expiresIn);
           setSpotifyAuthenticated(true);
-          setMusicSource('spotify');
         }
 
         // Clean up URL parameters from callback route
@@ -99,28 +123,211 @@ const App: React.FC = () => {
     setIsDarkMode(prev => !prev);
   };
 
-  // --- Audio Logic ---
+  // --- Spotify SDK Logic ---
 
   useEffect(() => {
-    if (audioRef.current) {
-      if (player.isPlaying && player.currentTrack) {
-        audioRef.current.play().catch(e => {
-          console.warn("Autoplay prevented:", e);
-          // If autoplay fails, we might need to sync state back to paused
-          setPlayer(prev => ({ ...prev, isPlaying: false }));
-          setTimer(prev => ({ ...prev, isActive: false }));
+    if (!spotifyAuthenticated || spotifyPlayerRef.current) return;
+
+    let isMounted = true;
+
+    const initSpotifyPlayer = async () => {
+      try {
+        await loadSpotifySdk();
+        if (!isMounted) return;
+
+        const spotifyToken = getSpotifyAccessToken();
+        if (!spotifyToken) return;
+
+        const SpotifyPlayer = (window as any).Spotify?.Player;
+        if (!SpotifyPlayer) return;
+
+        const sdkPlayer = new SpotifyPlayer({
+          name: 'RetroGroove Focus Player',
+          getOAuthToken: (cb: (token: string) => void) => {
+            const token = getSpotifyAccessToken();
+            cb(token || '');
+          },
+          volume: player.volume,
         });
-      } else {
-        audioRef.current.pause();
+
+        sdkPlayer.addListener('ready', async ({ device_id }: { device_id: string }) => {
+          setSpotifyDeviceId(device_id);
+          setSpotifySdkReady(true);
+
+          const token = getSpotifyAccessToken();
+          if (!token) return;
+
+          const transferResponse = await fetch('https://api.spotify.com/v1/me/player', {
+            method: 'PUT',
+            headers: {
+              Authorization: `Bearer ${token}`,
+              'Content-Type': 'application/json',
+            },
+            body: JSON.stringify({ device_ids: [device_id], play: false }),
+          });
+
+          if (!transferResponse.ok) {
+            const text = await transferResponse.text();
+            console.warn('Spotify transfer playback warning:', text);
+          }
+        });
+
+        sdkPlayer.addListener('not_ready', () => {
+          setSpotifySdkReady(false);
+        });
+
+        sdkPlayer.addListener('authentication_error', ({ message }: { message: string }) => {
+          console.error('Spotify authentication error:', message);
+        });
+
+        sdkPlayer.addListener('account_error', ({ message }: { message: string }) => {
+          console.error('Spotify account error:', message);
+          if (!spotifyPremiumErrorShown) {
+            alert('Spotify Premium is required for full in-app playback via Web Playback SDK.');
+            setSpotifyPremiumErrorShown(true);
+          }
+        });
+
+        sdkPlayer.addListener('playback_error', ({ message }: { message: string }) => {
+          console.error('Spotify playback error:', message);
+        });
+
+        const connected = await sdkPlayer.connect();
+        if (connected) {
+          spotifyPlayerRef.current = sdkPlayer;
+        }
+      } catch (error) {
+        console.error('Failed to initialize Spotify player:', error);
+      }
+    };
+
+    initSpotifyPlayer();
+
+    return () => {
+      isMounted = false;
+    };
+  }, [spotifyAuthenticated, player.volume, spotifyPremiumErrorShown]);
+
+  useEffect(() => {
+    if (!spotifyPlayerRef.current) return;
+    spotifyPlayerRef.current.setVolume(isMuted ? 0 : player.volume);
+  }, [player.volume, isMuted]);
+
+  const getAvailableDeviceId = async (token: string): Promise<string | null> => {
+    try {
+      const response = await fetch('https://api.spotify.com/v1/me/player/devices', {
+        headers: {
+          Authorization: `Bearer ${token}`,
+        },
+      });
+
+      if (!response.ok) return null;
+
+      const data = await response.json() as {
+        devices: Array<{ id: string; name: string; is_active: boolean }>;
+      };
+
+      const currentDevice = data.devices.find((d) => d.id === spotifyDeviceId);
+      if (currentDevice?.id) return currentDevice.id;
+
+      const activeDevice = data.devices.find((d) => d.is_active);
+      if (activeDevice?.id) return activeDevice.id;
+
+      const retroDevice = data.devices.find((d) => d.name === 'RetroGroove Focus Player');
+      return retroDevice?.id || null;
+    } catch {
+      return null;
+    }
+  };
+
+  const playTrackOnSpotify = async (track: AudiusTrack) => {
+    const token = getSpotifyAccessToken();
+    if (!token) return;
+
+    const trackUri = track.uri || `spotify:track:${track.id}`;
+
+    // Helps Safari/Chrome autoplay policies for SDK audio output.
+    if (spotifyPlayerRef.current?.activateElement) {
+      try {
+        await spotifyPlayerRef.current.activateElement();
+      } catch {
+        // Non-fatal if browser doesn't require it.
       }
     }
-  }, [player.isPlaying, player.currentTrack]);
+
+    const resolvedDeviceId = spotifyDeviceId || await getAvailableDeviceId(token);
+    if (!resolvedDeviceId) {
+      if (!spotifyPlaybackHintShown) {
+        alert('Spotify player is not ready yet. Wait 2-3 seconds after connecting, then press play again.');
+        setSpotifyPlaybackHintShown(true);
+      }
+      return;
+    }
+
+    if (resolvedDeviceId !== spotifyDeviceId) {
+      setSpotifyDeviceId(resolvedDeviceId);
+    }
+
+    const response = await fetch(`https://api.spotify.com/v1/me/player/play?device_id=${resolvedDeviceId}`, {
+      method: 'PUT',
+      headers: {
+        Authorization: `Bearer ${token}`,
+        'Content-Type': 'application/json',
+      },
+      body: JSON.stringify({ uris: [trackUri] }),
+    });
+
+    if (!response.ok) {
+      const text = await response.text();
+      console.error('Spotify play request failed:', text);
+      if (response.status === 403 && !spotifyPremiumErrorShown) {
+        alert('Spotify Premium is required for in-app full playback.');
+        setSpotifyPremiumErrorShown(true);
+      } else if (response.status === 404 || response.status === 400) {
+        alert('No active Spotify playback device found yet. Keep the app tab open and try pressing play again.');
+      }
+    }
+  };
+
+  const pauseSpotifyPlayback = async () => {
+    const token = getSpotifyAccessToken();
+    if (!token) return;
+
+    const resolvedDeviceId = spotifyDeviceId || await getAvailableDeviceId(token);
+    if (!resolvedDeviceId) return;
+
+    await fetch(`https://api.spotify.com/v1/me/player/pause?device_id=${resolvedDeviceId}`, {
+      method: 'PUT',
+      headers: {
+        Authorization: `Bearer ${token}`,
+      },
+    });
+  };
 
   useEffect(() => {
-    if (audioRef.current) {
-      audioRef.current.volume = isMuted ? 0 : player.volume;
+    const syncSpotifyPlayback = async () => {
+      if (!spotifySdkReady || !spotifyAuthenticated || !player.currentTrack) return;
+
+      if (player.isPlaying) {
+        await playTrackOnSpotify(player.currentTrack);
+      } else {
+        await pauseSpotifyPlayback();
+      }
+    };
+
+    syncSpotifyPlayback();
+  }, [player.isPlaying, player.currentTrack, spotifySdkReady, spotifyAuthenticated, spotifyDeviceId]);
+
+  useEffect(() => {
+    return () => {
+      if (spotifyPlayerRef.current) {
+        spotifyPlayerRef.current.disconnect();
+        spotifyPlayerRef.current = null;
+      }
+      setSpotifyDeviceId(null);
+      setSpotifySdkReady(false);
     }
-  }, [player.volume, isMuted]);
+  }, []);
 
   // --- Timer Logic ---
 
@@ -151,6 +358,17 @@ const App: React.FC = () => {
   };
 
   const toggleTimer = () => {
+    if (!spotifyAuthenticated) {
+      alert('Connect Spotify first from Settings.');
+      return;
+    }
+
+    if (!spotifySdkReady && !spotifyPlaybackHintShown) {
+      alert('Spotify player is still connecting. Please wait a moment and press play again.');
+      setSpotifyPlaybackHintShown(true);
+      return;
+    }
+
     // Removed alert blocking timer start without track
     const newActiveState = !timer.isActive;
     setTimer(prev => ({ ...prev, isActive: newActiveState }));
@@ -184,15 +402,7 @@ const App: React.FC = () => {
         isPlaying: true // Keep playing next track
       }));
     } else {
-      // Loop current track if queue is empty (optional, or just stop)
-      // For now, let's stop to match previous behavior, or we could loop.
-      // The user requested a queue, so let's assume they want flow.
-      // If queue is empty, maybe we should loop the *current* track like before?
-      // The previous code had `loop` prop. Let's replicate "Loop if no queue".
-      if (audioRef.current) {
-        audioRef.current.currentTime = 0;
-        audioRef.current.play();
-      }
+      setPlayer(prev => ({ ...prev, isPlaying: false }));
     }
   };
 
@@ -224,23 +434,8 @@ const App: React.FC = () => {
         onSelectTrack={handleTrackSelect}
         onAddToQueue={handleAddToQueue}
         currentTrack={player.currentTrack}
-        musicSource={musicSource}
-        onSourceChange={setMusicSource}
         spotifyAuthenticated={spotifyAuthenticated}
       />
-
-      {/* Hidden Audio Element */}
-      {player.currentTrack && (
-        <audio
-          ref={audioRef}
-          src={
-            musicSource === 'spotify' && player.currentTrack.preview_url
-              ? player.currentTrack.preview_url
-              : getStreamUrl(player.currentTrack.id)
-          }
-          onEnded={handleTrackEnd}
-        />
-      )}
 
       {/* Left / Top Section: Vinyl */}
       <main className="flex-1 flex flex-col items-center justify-center p-8 z-10 min-h-[50vh]">
@@ -329,7 +524,7 @@ const App: React.FC = () => {
 
         {/* Footer Info */}
         <div className="absolute bottom-4 text-[10px] text-charcoal/30 dark:text-matcha/30 font-mono text-center w-full px-4 transition-colors duration-500">
-          <p>POWERED BY {musicSource === 'spotify' ? 'SPOTIFY' : 'AUDIUS'} • BUILT FOR FOCUS</p>
+          <p>POWERED BY SPOTIFY • BUILT FOR FOCUS</p>
         </div>
       </aside>
 
@@ -341,7 +536,6 @@ const App: React.FC = () => {
         onSave={handleDurationUpdate}
         spotifyAuthenticated={spotifyAuthenticated}
         onSpotifyAuth={setSpotifyAuthenticated}
-        musicSource={musicSource}
       />
     </div>
   );

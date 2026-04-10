@@ -12,6 +12,8 @@ export interface AudiusTrack {
   } | null;
   duration: number;
   preview_url?: string;
+  spotify_url?: string;
+  uri?: string;
   source?: 'audius' | 'spotify';
 }
 

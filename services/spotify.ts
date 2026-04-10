@@ -138,10 +138,15 @@ export const setSpotifyAccessToken = (token: string) => {
 // Restore token from storage
 export const restoreSpotifyToken = (): boolean => {
   const token = localStorage.getItem('spotify_access_token');
-  if (token) {
+  if (token && !isTokenExpired()) {
     spotifyApi.setAccessToken(token);
     return true;
   }
+
+  if (token && isTokenExpired()) {
+    clearSpotifyToken();
+  }
+
   return false;
 };
 
@@ -158,6 +163,10 @@ export const storeSpotifyToken = (token: string, expiresIn: number = 3600) => {
   localStorage.setItem('spotify_access_token', token);
   localStorage.setItem('spotify_token_expires', (Date.now() + expiresIn * 1000).toString());
   spotifyApi.setAccessToken(token);
+};
+
+export const getSpotifyAccessToken = (): string | null => {
+  return localStorage.getItem('spotify_access_token');
 };
 
 // Check if token is expired
@@ -180,9 +189,8 @@ const toArtwork = (url?: string) => {
 export const searchSpotifyTracks = async (query: string): Promise<AudiusTrack[]> => {
   if (!query) return [];
   try {
-    const results = await spotifyApi.searchTracks(query, { limit: 10 });
+    const results = await spotifyApi.searchTracks(query, { limit: 10, market: 'from_token' });
     return results.tracks.items
-      .filter((track) => !!track.preview_url)
       .map((track) => {
         const artistName = track.artists[0]?.name || 'Unknown Artist';
         return {
@@ -195,6 +203,8 @@ export const searchSpotifyTracks = async (query: string): Promise<AudiusTrack[]>
           artwork: toArtwork(track.album.images[0]?.url),
           duration: Math.floor(track.duration_ms / 1000),
           preview_url: track.preview_url || undefined,
+          spotify_url: track.external_urls?.spotify,
+          uri: track.uri,
           source: 'spotify',
         };
       });
