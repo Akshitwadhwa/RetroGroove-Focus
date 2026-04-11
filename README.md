@@ -43,6 +43,36 @@ Follow these steps to get the project running locally on your machine.
 - **Node.js** (v18 or higher recommended)
 - **npm** or **yarn**
 
+### Spotify Login Setup
+
+RetroGroove-Focus uses Spotify OAuth (PKCE) on the frontend.
+
+1. Create a Spotify app in the [Spotify Developer Dashboard](https://developer.spotify.com/dashboard).
+2. Copy your **Client ID**.
+3. In your Spotify app settings, add redirect URIs such as:
+  - `http://localhost:5173/callback`
+  - `https://your-production-domain.com/callback`
+4. Create a local env file (for example `.env.local`) and add:
+
+```bash
+VITE_SPOTIFY_CLIENT_ID=your_spotify_client_id
+VITE_SPOTIFY_REDIRECT_URI=http://localhost:5173/callback
+```
+
+Notes:
+- A Spotify Client Secret is **not required** for this PKCE flow.
+- If `VITE_SPOTIFY_REDIRECT_URI` is omitted, the app defaults to `window.location.origin/callback`.
+- For full in-app playback via Spotify Web Playback SDK, a Spotify Premium account is required.
+
+### Run Locally
+
+```bash
+npm install
+npm run dev
+```
+
+Then open the app, go to **Settings**, and click **Connect Spotify**.
+
 
 ## 📂 Project Structure
 
